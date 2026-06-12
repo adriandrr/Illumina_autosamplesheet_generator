@@ -87,7 +87,7 @@ B) Sample file (YOU create this)
     SampleB,UDP0002,2
     SampleC,UDP0003,6
 
-    4. Hybrid index assignment (NEW):
+    4. Hybrid index assignment
 
     sample_name,index_name,lane
     WWKK2426-170,,8
@@ -100,10 +100,11 @@ B) Sample file (YOU create this)
     → Requires --start-index or -s
     → Already configured index names will NOT be changed
     → Missing index names will automatically be assigned sequentially
-    starting from the provided --start-index
+      starting from the provided --start-index
     → Automatic assignment follows the row order in the file
     → V3 indexes are considered automatically
-    → Duplicate Indexes (manually and automatically given) will cause an ERROR
+    → The script will print a detailed warning showing all automatically
+      assigned samples and indices
     → Manual verification is recommended
 
     Example:
@@ -119,9 +120,38 @@ B) Sample file (YOU create this)
     WWKK2428-130 → UDP0026
     WWKK2428-131 → UDP0027
 
-    Rules:
-    - lane must be 1–8
-    - leave lane empty to auto-assign
+    5. Sample name validation
+
+    Sample names are checked against Illumina naming recommendations.
+
+    Allowed characters:
+        A-Z
+        a-z
+        0-9
+        -
+        _
+
+    Not allowed:
+        spaces
+        ? . ( ) [ ] / \ = + < > : ; " ' , * ^ | &
+
+    Additional checks:
+        - sample names should not start with '-'
+        - sample names should not end with '-'
+        - sample names should not start with '_'
+        - sample names should not end with '_'
+        - sample names should not exceed 40 characters
+        - reserved names are discouraged:
+            all
+            default
+            none
+            unknown
+            undetermined
+            stats
+            reports
+
+    Violations generate WARNINGS only.
+    SampleSheet creation continues.
 
 ----------------------------------------
 3. RUNNING THE SCRIPT
@@ -186,12 +216,28 @@ of already validated SampleSheets.
 ----------------------------------------
 
 Creates:
-    Samplesheet1.csv
 
-(Hopefully) Ready for direct upload to Illumina system.
+    SampleSheet.csv
+
+and additionally:
+
+    SampleSheet.log
+
+The log file contains:
+
+    - warnings
+    - errors
+    - automatic index assignments
+    - duplicate sample reports
+    - duplicate index reports
+    - validation messages
+    - run settings
+
+The generated SampleSheet should be reviewed before upload
+to the Illumina system.
 
 ----------------------------------------
-6. COMMON ERRORS
+6. COMMON ERRORS / WARNINGS
 ----------------------------------------
 
 ERROR: Missing index columns
@@ -199,9 +245,6 @@ ERROR: Missing index columns
 
 ERROR: Start index not found
 → Typo in index name
-
-ERROR: Duplicate sample names
-→ Each sample must be unique
 
 ERROR: Lane must be between 1 and 8
 → Fix lane column
@@ -211,13 +254,42 @@ ERROR: Some samples contain index names while others are empty
     - provide ALL index names manually
     - OR use --start-index for automatic completion
 
-ERROR: Duplicate index assignments detected
-→ The same index was assigned multiple times
-→ Check hybrid assignment carefully
+ERROR: Invalid index 'UDPxxxx' for sample 'SampleA'
+→ Index does not exist in index file
 
-ERROR: Output file already exists
+ERROR: Duplicate index assignments found within the same lane
+→ The same index is used multiple times in one lane
+
+Example:
+
+    Lane 1: UDP0008 used 2 times
+      - SampleA
+      - SampleB
+
+Using the same index in different lanes is allowed.
+
+WARNING: Duplicate sample names detected
+→ Sample names occur more than once
+
+Example:
+
+    SampleA: 3 occurrences
+
+WARNING: Sample name validation issues detected
+→ Sample name may violate Illumina naming recommendations
+
+Example:
+
+    Sample Name - contains invalid character(s): ' '
+
+WARNING: Hybrid index assignment detected
+→ Some indices were assigned manually
+→ Remaining indices were assigned automatically
+
+WARNING: Output file already exists
 → Confirm overwrite with:
     y / yes
+
 → Or choose a different output filename using:
     --output / -o
 
@@ -225,12 +297,37 @@ ERROR: Output file already exists
 7. TIPS
 ----------------------------------------
 
-- Use Notion/Excel to prepare sample sheet, then export as CSV
+- Use Excel, Notion or LibreOffice to prepare sample files
+- Export tables as CSV whenever possible
 - Double-check index names carefully
-- Keep original index file unchanged
+- Keep original index files unchanged
 - Hybrid index assignment is useful for partially prepared runs
-- Always manually inspect automatically assigned indices
-- Avoid duplicate index combinations whenever possible
+- Always inspect automatically assigned indices
+- Review duplicate sample warnings carefully
+- Avoid reusing indices within the same lane
+- Store SampleSheet.csv and SampleSheet.log together
+- Use descriptive run names
 - Use different output names for test runs
 
-========================================================
+----------------------------------------
+8. LOGGING
+----------------------------------------
+
+All warnings, errors and informational messages are written
+both to the console and to a log file.
+
+Example:
+
+    SampleSheet.csv
+    SampleSheet.log
+
+The log file contains:
+
+    INFO
+    WARNING
+    ERROR
+
+messages generated during SampleSheet creation.
+
+This file can be archived together with sequencing run
+documentation for traceability.
