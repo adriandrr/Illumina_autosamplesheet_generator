@@ -343,7 +343,7 @@ def parse_input_file(file_path, index_names, start_index=None):
     return df
 
 
-def write_samplesheet(output, run_name, df, index_lookup, read_cycles, index_cycles):
+def write_samplesheet(output, run_name, df, index_lookup, read_cycles, index_cycles, software_version):
     with open(output, "w") as f:
         f.write("[Header],\n")
         f.write("FileFormatVersion,2\n")
@@ -358,7 +358,7 @@ def write_samplesheet(output, run_name, df, index_lookup, read_cycles, index_cyc
         f.write(f"Index2Cycles,{index_cycles}\n\n")
 
         f.write("[BCLConvert_Settings]\n")
-        f.write("SoftwareVersion,4.3.16\n")
+        f.write(f"SoftwareVersion,{software_version}\n")
         f.write("AdapterRead1,CTGTCTCTTATACACATCT\n")
         f.write("AdapterRead2,CTGTCTCTTATACACATCT\n")
         f.write("OverrideCycles,Y151;I10;I10;Y151\n")
@@ -388,6 +388,7 @@ def main():
                         help="Start index for automatic assignment (required for one-column input) example: UDP0001",
     )
     parser.add_argument("--read-cycles","-rc", default="151", help="Readcycles (default: 301)")
+    parser.add_argument("--software-version","-v", default="4.4.12", help="SoftwareVersion (default: 4.4.12)")
     parser.add_argument("--index-cycles","-ic", default="10", help="Indexcycles (default: 8)")
     parser.add_argument("--output","-o", default="SampleSheet.csv",
         help="Output SampleSheet file (default: SampleSheet.csv)")
@@ -438,13 +439,14 @@ def main():
     validate_sample_names(df)
     validate_duplicate_indices_per_lane(df)
 
-    write_samplesheet(args.output, args.run_name, df, index_lookup, args.read_cycles, args.index_cycles)
+    write_samplesheet(args.output, args.run_name, df, index_lookup, args.read_cycles, args.index_cycles, args.software_version)
     
     unique_samples = df["sample_name"].nunique()
     
     log(f"INFO: Runname set to {args.run_name}")
     log(f"INFO: Read cycles set to {args.read_cycles}")
     log(f"INFO: Index cycles set to {args.index_cycles}")
+    log(f"INFO: SoftwareVersion set to {args.software_version}")
     log(f"INFO: Total sample-lane combinations: {len(df)}")
     log(f"INFO: Unique samples: {unique_samples}")
     log("INFO: SampleSheet created successfully.")

@@ -175,6 +175,7 @@ order free to choose
   --run-name/-r MyRun
   --read-cycl/-rc 151
   --index-cycle/-ic 10
+  --software-version/-v 4.4.12
   --output/-o Samplesheet1.csv
 
 ----------------------------------------
