@@ -27,13 +27,23 @@ pip install pandas
 ----------------------------------------
 
 2.1 Index File (provided by Illumina, prepared by Adrian)
-
 This file contains the mapping between index names and sequences.
 
 Required format:
+
+NexteraXT indexes
 i7_Index_Name,i7_Bases_for_MiSeq,i5_Index_Name,i5_Bases_for_MiSeq
 N701,TAAGGCGA,S501,TAGATCGC
 N702,CGTACTAG,S502,CTCTCTAT
+...
+
+OR
+
+UDP indexes
+Index_Name,i7_Bases_in_Adapter,i7_Bases_for_Sample_Sheet,i5_Bases_in_Adapter,i5_Bases_for_Sample_Sheet_in_Forward_Orientation,i5_Bases_for_Sample_Sheet_in_Reverse_Complement_Orientation
+UDP0001,CGCTCAGTTC,GAACTGAGCG,TCGTGGAGCG,TCGTGGAGCG,CGCTCCACGA,
+UDP0002,TATCTGACCT,AGGTCAGATA,CTACAAGATA,CTACAAGATA,TATCTTGTAG,
+UDP0003V3,TCGGATGTCG,CGACATCCGA,TACGTTCATT,TACGTTCATT,AATGAACGT
 ...
 
 2.2 Sample Configuration File (you create this)
@@ -46,12 +56,21 @@ Sample1,N701,S501
 Sample2,N702,S502
 Sample3,N703,S503
 
+OR
+
+sample_name,UD_index
+Sample1,UDP0001
+Sample2,UDP0002
+Sample3,UDP0003V3
+
 Important rules:
 Header must be present
 Column names must match exactly:
 sample_name
 i7_index
 i5_index
+OR
+UDP
 No empty cells allowed
 Sample names must be unique
 Index names must exist in the index file
@@ -91,9 +110,21 @@ python3 miseqi100_autosamplesheet.py \
   -ic 8 \
   -o SampleSheet.csv
 
+For Running the script with UDP Indexes:
+
+python3 miseqi100_autosamplesheet.py \
+  -i UDP-index.csv \
+  -c samples.csv \
+  -r MyRun \
+  -rc 301 \
+  -ic 8 \
+  -s UD \
+  -o SampleSheet.csv
+
 Parameters explained
 Parameter	Description
 -i / --index-file	Index reference file
+-s / --index-set	Specification of index set (default: NT; UD possible)
 -c / --sample-config	Sample configuration file
 -r / --run-name	Name of sequencing run
 -rc / --read-cycles	Read length (default: 301)

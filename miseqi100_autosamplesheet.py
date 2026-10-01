@@ -37,27 +37,40 @@ def detect_delimiter(file_path: str) -> str:
         except Exception:
             return None
 
-def load_index_file(index_file):
+def load_index_file(index_file, index_set):
     path = Path(index_file)
     if not path.exists():
         raise SampleSheetError(f"Index file not found: {index_file}")
 
-    df = pd.read_csv(path)
 
-    required = {
-        "i7_Index_Name",
-        "i7_Bases_for_MiSeq",
-        "i5_Index_Name",
-        "i5_Bases_for_MiSeq",
-    }
+    if index_set == "NT":
+        df = pd.read_csv(path)
+        required = {"i7_Index_Name","i7_Bases_for_MiSeq","i5_Index_Name","i5_Bases_for_MiSeq",}
 
-    missing = required - set(df.columns)
-    if missing:
-        raise SampleSheetError(f"Missing columns in index file: {missing}")
+        missing = required - set(df.columns)
+        if missing:
+            raise SampleSheetError(f"Missing columns in index file: {missing}")
 
-    # Build lookup dictionaries
-    i7_lookup = dict(zip(df["i7_Index_Name"], df["i7_Bases_for_MiSeq"]))
-    i5_lookup = dict(zip(df["i5_Index_Name"], df["i5_Bases_for_MiSeq"]))
+        # Build lookup dictionaries
+        i7_lookup = dict(zip(df["i7_Index_Name"], df["i7_Bases_for_MiSeq"]))
+        i5_lookup = dict(zip(df["i5_Index_Name"], df["i5_Bases_for_MiSeq"]))
+    
+    elif index_set == "UD":
+        df = pd.read_csv(path,index_col=False)
+        required = {
+            "Index_Name",
+            "i7_Bases_for_Sample_Sheet",
+            "i5_Bases_for_Sample_Sheet_in_Forward_Orientation"
+            }
+
+        missing = required - set(df.columns)
+        if missing:
+            raise SampleSheetError(f"Missing columns in index file: {missing}")
+        # Build lookup dictionaries
+        i7_lookup = dict(zip(df["Index_Name"], df["i7_Bases_for_Sample_Sheet"]))
+        i5_lookup = dict(zip(df["Index_Name"], df["i5_Bases_for_Sample_Sheet_in_Forward_Orientation"]))
+    else:
+        raise SampleSheetError(f"Index set must be NT (NexteraXT) or UD (UDP Indexes): {index_set}")
 
     return i7_lookup, i5_lookup
 
@@ -65,14 +78,20 @@ def load_index_file(index_file):
 # -----------------------------
 # Load sample file
 # -----------------------------
-def load_sample_file(sample_file):
+def load_sample_file(sample_file, index_set):
     path = Path(sample_file)
     if not path.exists():
         raise SampleSheetError(f"Sample file not found: {sample_file}")
 
     df = pd.read_csv(sample_file,sep=detect_delimiter(sample_file),engine="python")
 
-    required = {"sample_name", "i7_index", "i5_index"}
+    if index_set == "NT":
+        required = {"sample_name", "i7_index", "i5_index"}
+    elif index_set == "UD":
+        required = {"sample_name", "UD_index"}
+    else:
+        raise SampleSheetError(f"Index set must be NT (NexteraXT) or UD (UDP Indexes): {index_set}")
+    
     missing = required - set(df.columns)
 
     if missing:
@@ -95,25 +114,45 @@ def load_sample_file(sample_file):
 # -----------------------------
 # Build SampleSheet
 # -----------------------------
-def build_samplesheet(df, i7_lookup, i5_lookup):
+def build_samplesheet(df, index_set, i7_lookup, i5_lookup):
     rows = []
+    
+    if index_set == "NT":
+        for _, row in df.iterrows():
+            sample = row["sample_name"]
+            i7_name = row["i7_index"]
+            i5_name = row["i5_index"]
 
-    for _, row in df.iterrows():
-        sample = row["sample_name"]
-        i7_name = row["i7_index"]
-        i5_name = row["i5_index"]
+            if i7_name not in i7_lookup:
+                raise SampleSheetError(f"Invalid i7 index '{i7_name}' for sample '{sample}'")
 
-        if i7_name not in i7_lookup:
-            raise SampleSheetError(f"Invalid i7 index '{i7_name}' for sample '{sample}'")
+            if i5_name not in i5_lookup:
+                raise SampleSheetError(f"Invalid i5 index '{i5_name}' for sample '{sample}'")
 
-        if i5_name not in i5_lookup:
-            raise SampleSheetError(f"Invalid i5 index '{i5_name}' for sample '{sample}'")
+            rows.append({
+                "Sample_ID": sample,
+                "Index": i7_lookup[i7_name],
+                "Index2": i5_lookup[i5_name],
+            })
+    elif index_set == "UD":
+        for _, row in df.iterrows():
+            sample = row["sample_name"]
+            UD_name = row["UD_index"]
 
-        rows.append({
-            "Sample_ID": sample,
-            "Index": i7_lookup[i7_name],
-            "Index2": i5_lookup[i5_name],
-        })
+            if UD_name not in i7_lookup:
+                raise SampleSheetError(f"Invalid i7 index '{UD_name}' for sample '{sample}'")
+
+            if UD_name not in i5_lookup:
+                raise SampleSheetError(f"Invalid i5 index '{UD_name}' for sample '{sample}'")
+
+            rows.append({
+                "Sample_ID": sample,
+                "Index": i7_lookup[UD_name],
+                "Index2": i5_lookup[UD_name],
+            })
+    else:
+        raise SampleSheetError(f"Index set must be NT (NexteraXT) or UD (UDP Indexes): {index_set}")
+        
 
     return pd.DataFrame(rows)
 
@@ -163,8 +202,9 @@ def main():
         description="Generate SampleSheet from dual-index input"
     )
 
-    parser.add_argument("--index-file","-i", required=True, help="Illumina index set CSV (default: set_NexteraXT_index_adapters.csv)")
+    parser.add_argument("--index-file","-i", required=True, help="Illumina index set CSV")
     parser.add_argument("--sample-config","-c", required=True, help="Sample input file (see: README)")
+    parser.add_argument("--index-set","-s", default="NT", help="Specification of index set (default: NT; UD possible)")
     parser.add_argument("--run-name","-r", default="Runname123", help="Run name (default: Runname123)")
     parser.add_argument("--read-cycles","-rc", default="301", help="Readcycles (default: 301)")
     parser.add_argument("--index-cycles","-ic", default="8", help="Indexcycles (default: 8)")
@@ -175,10 +215,10 @@ def main():
     if args.run_name == "Runname123":
         print("Warning: No Runname given, used default Runname123, please change manually")
 
-    i7_lookup, i5_lookup = load_index_file(args.index_file)
-    sample_df = load_sample_file(args.sample_config)
+    i7_lookup, i5_lookup = load_index_file(args.index_file, args.index_set)
+    sample_df = load_sample_file(args.sample_config, args.index_set)
 
-    result_df = build_samplesheet(sample_df, i7_lookup, i5_lookup)
+    result_df = build_samplesheet(sample_df, args.index_set, i7_lookup, i5_lookup)
 
     write_samplesheet(result_df, args.output, args.run_name, args.read_cycles, args.index_cycles)
 
